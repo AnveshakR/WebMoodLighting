@@ -2,11 +2,15 @@
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+//#include <ESP8266mDNS.H>
+#include <WiFiUdp.h>
 #include <FastLED.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <ArduinoOTA.h>
+#include "wifi.h"
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -14,21 +18,23 @@
 #define SCREEN_ADDRESS 0x3C
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+// SCL D3 FOR ESP 12E
+// SDA D4 FOR ESP 12E
 #define DATA D5
 #define NUM_LEDS 100 
 
-float gauss[100] = {0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6, 7, 9, 10, 12, 14, 16, 18, 20, 23, 26, 29, 32, 36, 40, 44, 48, 52, 56, 61, 65, 69, 73, 77, 81, 85, 88, 91, 94, 96, 98, 99, 100, 100, 100, 99, 98, 96, 94, 91, 88, 85, 81, 77, 73, 69, 65, 61, 56, 52, 48, 44, 40, 36, 32, 29, 26, 23, 20, 18, 16, 14, 12, 10, 9, 7, 6, 5, 
-4, 4, 3, 3, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0, 0};
+int gauss_size = 100;
+float gauss[100] = {5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 8, 9, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 26, 28, 31, 34, 37, 40, 43, 47, 50, 54, 57, 60, 64, 67, 70, 73, 76, 
+78, 80, 82, 83, 84, 85, 85, 85, 84, 83, 82, 80, 78, 76, 73, 70, 67, 64, 60, 57, 54, 50, 47, 43, 40, 37, 34, 31, 28, 26, 23, 21, 19, 17, 16, 14, 13, 12, 11, 10, 
+9, 9, 8, 7, 7, 7, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5};
 
 AsyncWebServer server(80);
 
 String hex_val,picker_val,display_radio_val,color_radio_val;
 int breath_val=50,r_val,g_val,b_val;
 float brightness;
-float gmma = 0.14; // affects the width of peak (more or less darkness)
-float beta = 0.5; // shifts the gaussian to be symmetric
-const char* ssid = "Trojan";
-const char* password = "NModi1@9";
+const char* ssid = WLAN;
+const char* password = PASS;
 const char* hex_param = "hex_input";
 const char* picker_param = "picker_input";
 const char* color_radio = "color_input";
@@ -136,6 +142,26 @@ void setup() {
     Serial.println("Connecting...");
     return;
   }
+
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+  ArduinoOTA.begin();
+  
   Serial.println();
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
@@ -180,15 +206,6 @@ void color_set(AsyncWebServerRequest *request)
   }
 }
 
-//String num_to_text(int num)
-//{
-//  String num = String(num);
-//  for(int i=3;i>num.length();i++)
-//  {
-//    num = "0"+num;
-//  }
-//}
-
 void loop()
 { 
   if (val_change == true)
@@ -215,24 +232,21 @@ void loop()
     {
       leds[cur] = CRGB(r_val,g_val,b_val);
       FastLED.setBrightness(85);
-      FastLED.show();
-      FastLED.delay(1);
     }
+    FastLED.show();
+    FastLED.delay(1);
   }
   else if (display_radio_val=="breathing")
   {
-    //Serial.println("dimming");
-    for (int i=100; i>=0; i--)
+    for (int i=gauss_size-1; i>=0; i--)
     {
       Serial.println(gauss[i]);
       for (int c=0; c<NUM_LEDS; c++)
       {
-        leds[c] = CRGB(r_val,g_val,b_val);
-        FastLED.setBrightness(gauss[i]);     
-        FastLED.show();
-        //FastLED.delay(5);
+        leds[c] = CRGB((r_val*gauss[i])/100,(g_val*gauss[i])/100,(b_val*gauss[i])/100);
       }
-      FastLED.delay(1);
+      FastLED.show();
+      FastLED.delay(32);
     }
   }
 }
