@@ -2,15 +2,17 @@
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <EEPROM.h>
+//#include <EEPROM.h>
 #include <WiFiUdp.h>
 #include <NeoPixelBus.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <ArduinoOTA.h>
+#include "arduinoFFT.h"
+//#include <ArduinoOTA.h>
 #include "wifi.h"
+#include "webpage.h"
 
 #define EEPROM_SIZE 4
 #define SCREEN_WIDTH 128
@@ -20,12 +22,20 @@
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// SCL D3 FOR ESP 12E
-// SDA D4 FOR ESP 12E
-#define DATA D5
-#define NUM_LEDS 100
+// SCL D3 SDA D4 ESP 12E
+// SCL D1 SDA D2 ESP 12F
+
+#define NUM_LEDS 300
+
+arduinoFFT FFT = arduinoFFT();
+
+#define SAMPLES 256
+#define SAMPLING_FREQUENCY 10000
+#define amplitude 200
+#define sound A0
 
 NeoPixelBus<NeoGrbFeature, NeoEsp8266Dma800KbpsMethod> strip(NUM_LEDS);
+//LED DATA ON RX PIN
 
 int gauss_size = 100;
 float gauss[100] = { 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 8, 9, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 26, 28, 31, 34, 37, 40, 43, 47, 50, 54, 57, 60, 64, 67, 70, 73, 76,
@@ -36,7 +46,7 @@ AsyncWebServer server(80);
 
 String hex_val, picker_val, color_val;
 int breath_val = 50, r_val, g_val, b_val, display_radio_val;
-float brightness;
+float brightness,newval, oldval, slope, scaleval = 0.5;
 const char* ssid = WLAN;
 const char* password = PASS;
 const char* picker_param = "picker_input";
@@ -44,63 +54,15 @@ const char* display_radio = "display_input";
 const char* breath_param = "breath_input";
 bool val_change = true;
 
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML>
-<html>
-  <head>
-    <title>LED Control</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-      html {
-        font-family: Sans-Serif;
-        display: block;
-        background-color: #222831;
-        color: #EEEEEE;
-        text-align: center
-      }
+unsigned int sampling_period_us;
+unsigned long microseconds;
+unsigned long oldTime, newTime;
+double vReal[SAMPLES];
+double vImag[SAMPLES];
+int led_bands[8];
+float scale;
 
-      p {
-        color: #EEEEEE;
-      }
-
-      h2 {
-        font-size: 3.0rem;
-        color: #7BC74D
-      }
-
-      input {
-        background-color: #393E46;
-        color: #EEEEEE
-      }
-
-      button {
-        background-color: #393E46;
-        color: #EEEEEE
-      }
-
-      form {
-        padding: 15px
-      }
-
-      ;
-    </style>
-  </head>
-  <body>
-    <h2>LED Control</h2>
-    <form action="/">
-      <p>Pick a color:</p><input type="color" name="picker_input" id="picker" />
-      <br>
-      <br>
-      <p>Select display type:</p>
-      <input type="radio" id="solid" name="display_input" value="0">Solid Color <br>
-      <br>
-      <input type="radio" id="breathing" name="display_input" value="1">Breathing <br>
-      <br>
-      <br>
-      <input type="submit" value="Submit">
-    </form>
-  </body>
-</html>)rawliteral";
+#include "ledfunc.h"
 
 void notFound(AsyncWebServerRequest* request) {
   request->send(404, "text/plain", "Not found");
@@ -149,31 +111,35 @@ void setup() {
   WiFi.begin(ssid, password);
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.println("Connecting...");
+    display_text("Unable to connect to", 0, 30, 1);
+    display_text(ssid, 0, 40, 1);
+    val_change = false;
     return;
   }
+  display_rect(0, 20, 84, 10);
 
-  ArduinoOTA.onStart([]() {
-    Serial.println("Start");
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR)
-      Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR)
-      Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR)
-      Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR)
-      Serial.println("End Failed");
-  });
-  ArduinoOTA.begin();
+  // ArduinoOTA.onStart([]() {
+  //   Serial.println("Start");
+  // });
+  // ArduinoOTA.onEnd([]() {
+  //   Serial.println("\nEnd");
+  // });
+  // ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+  //   Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  // });
+  // ArduinoOTA.onError([](ota_error_t error) {
+  //   Serial.printf("Error[%u]: ", error);
+  //   if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+  //   else if (error == OTA_BEGIN_ERROR)
+  //     Serial.println("Begin Failed");
+  //   else if (error == OTA_CONNECT_ERROR)
+  //     Serial.println("Connect Failed");
+  //   else if (error == OTA_RECEIVE_ERROR)
+  //     Serial.println("Receive Failed");
+  //   else if (error == OTA_END_ERROR)
+  //     Serial.println("End Failed");
+  // });
+  // ArduinoOTA.begin();
 
   Serial.println();
   Serial.print("IP Address: ");
@@ -185,7 +151,8 @@ void setup() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/html", index_html);
     String input_parameter;
-    if (request->hasParam("display_input")) {
+    if ((request->hasParam("display_input") and request->hasParam("picker_input"))) {
+
       val_change = true;
       color_val = request->getParam("picker_input")->value();
       display_radio_val = (request->getParam("display_input")->value()).toInt();
@@ -204,9 +171,21 @@ void setup() {
   //  g_val = EEPROM.read(1);
   //  b_val = EEPROM.read(2);
   //  display_radio_val = EEPROM.read(3);
+
+  pinMode(sound, INPUT);
+  sampling_period_us = round(1000000 * (1.0 / SAMPLING_FREQUENCY));
+
+  int div = NUM_LEDS/7;
+
+  for(int i=0 ; i<7 ; i++)
+  {
+    led_bands[i] = round(div*i);
+  }
+  led_bands[8] = NUM_LEDS;
 }
 
 void loop() {
+
   if (val_change == true) {
     display_text("Red: ", 0, 32, 1);
     display_rect(50, 32, 21, 10);
@@ -225,19 +204,16 @@ void loop() {
 
   if (display_radio_val == 0)  //solid mode
   {
-    for (int i = 0; i < NUM_LEDS; i++) {
-      strip.SetPixelColor(i, RgbColor(r_val*0.85,g_val*0.85,b_val*0.85));
-    }
-    strip.Show();
-    delay(1);
-  } else if (display_radio_val == 1)  //breathing mode
+    solid_mode();
+  } 
+  
+  else if (display_radio_val == 1)  //breathing mode
   {
-    for (int i = gauss_size - 1; i >= 0; i--) {
-      for (int j = 0; j < NUM_LEDS; j++) {
-        strip.SetPixelColor(j, RgbColor((r_val * gauss[i]) / 100, (g_val * gauss[i]) / 100, (b_val * gauss[i]) / 100));
-      }
-      strip.Show();
-      delay(32);
-    }
+    breathing_mode();
+  }
+
+  else if (display_radio_val == 2)   //AV mode
+  {
+    basicAV_mode();
   }
 }
