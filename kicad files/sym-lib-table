@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "led_web_sym")(type "KiCad")(uri "${KIPRJMOD}/led_web_sym.kicad_sym")(options "")(descr ""))
+)

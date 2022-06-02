@@ -62,6 +62,9 @@ double vImag[SAMPLES];
 int led_bands[8];
 float scale;
 
+bool ap_status = false;
+String ip;
+
 #include "ledfunc.h"
 
 void notFound(AsyncWebServerRequest* request) {
@@ -107,16 +110,27 @@ void setup() {
   strip.Begin();
   strip.Show();
 
+  //AsyncWebServer server(80);
+
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.println("Connecting...");
+  
+  if (WiFi.waitForConnectResult() != WL_CONNECTED) 
+  {
     display_text("Unable to connect to", 0, 30, 1);
     display_text(ssid, 0, 40, 1);
-    val_change = false;
-    return;
+    display_text("Switching to AP Mode.", 0, 50, 1);
+    ap_status = true;
+    delay(5000);
   }
-  display_rect(0, 20, 84, 10);
+  
+  if (ap_status == true)
+  {
+    WiFi.disconnect();
+    WiFi.mode(WIFI_AP);
+    Serial.println(WiFi.softAP("WiFi_LED", "1234") ? "Ready" : "Failed!");
+  }
+  display_rect(0, 20, 128, 46);
 
   // ArduinoOTA.onStart([]() {
   //   Serial.println("Start");
@@ -143,10 +157,10 @@ void setup() {
 
   Serial.println();
   Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
-  String ip = WiFi.localIP().toString();
+  Serial.println(ap_status? WiFi.softAPIP().toString() : WiFi.localIP().toString());
+
   display_text("IP:", 0, 20, 1);
-  display_text(ip, 17, 20, 1);
+  display_text(ap_status? WiFi.softAPIP().toString() : WiFi.localIP().toString(), 17, 20, 1);
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/html", index_html);
