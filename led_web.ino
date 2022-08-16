@@ -25,7 +25,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 // SCL D3 SDA D4 ESP 12E
 // SCL D1 SDA D2 ESP 12F
 
-#define NUM_LEDS 300
+#define NUM_LEDS 30
 
 arduinoFFT FFT = arduinoFFT();
 
