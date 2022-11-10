@@ -33,7 +33,7 @@ I have included the Arduino program, along with the KiCAD project for the PCB de
 
 ### TO-DO
 
-- [ ] Proper commenting lol
+- [x] Proper commenting lol
 - [ ] Select particular audio freq for AV
 - [ ] Select Wi-Fi network
 - [ ] Load last config from memory
