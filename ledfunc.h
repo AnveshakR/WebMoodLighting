@@ -1,4 +1,4 @@
-void solid_mode()
+void solid_mode() // single color
 {
   for (int i = 0; i < NUM_LEDS; i++) 
     {
@@ -10,7 +10,7 @@ void solid_mode()
     delay(1);
 }
 
-void breathing_mode()
+void breathing_mode() // gaussian breathing
 {
   for (int i = gauss_size - 1; i >= 0; i--) {
 
@@ -27,7 +27,7 @@ void breathing_mode()
 
 void basicAV_mode()
 {
-  for (int i = 0; i < SAMPLES; i++) 
+  for (int i = 0; i < SAMPLES; i++) // collects samples equal to sample size from microphone
   {
 
     if(val_change == true) {val_change = false;break;}
@@ -36,7 +36,7 @@ void basicAV_mode()
     oldTime = newTime;
     vReal[i] = analogRead(A0); // A conversion takes about 1mS on an ESP8266
     vImag[i] = 0;
-    while (micros() < (newTime + sampling_period_us)) { /* do nothing to wait */ }
+    while (micros() < (newTime + sampling_period_us)) { /* do nothing to wait */ } // wait until all the samples are collected
   }
   FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
   FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
