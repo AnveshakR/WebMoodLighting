@@ -9,12 +9,13 @@ The design has the following components:
 - `SSD1306 128x64 OLED Display (SPI config)`
 - `MAX4466 Electret Microphone Amplifier with Adjustable Gain Module`
 - `10kΩ Potentiometer`
-- `1μF 63V Capacitor`
+- `10μF 50V Capacitor`
 
 The current program has the following functions:
 - Solid color display
 - Breathing color display
 - Basic Audio-Visualizer color display
+- Color Spectrum
 
 The audio visualizer is based on an FFT transform of the input data from the MAX4466.
 

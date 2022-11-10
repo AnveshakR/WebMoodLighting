@@ -25,7 +25,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 // SCL D3 SDA D4 ESP 12E
 // SCL D1 SDA D2 ESP 12F
 
-#define NUM_LEDS 30
+#define NUM_LEDS 300
 
 arduinoFFT FFT = arduinoFFT();
 
@@ -38,14 +38,14 @@ NeoPixelBus<NeoGrbFeature, NeoEsp8266Dma800KbpsMethod> strip(NUM_LEDS);
 //LED DATA ON RX PIN
 
 int gauss_size = 100;
-float gauss[100] = { 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 8, 9, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 26, 28, 31, 34, 37, 40, 43, 47, 50, 54, 57, 60, 64, 67, 70, 73, 76,
-                     78, 80, 82, 83, 84, 85, 85, 85, 84, 83, 82, 80, 78, 76, 73, 70, 67, 64, 60, 57, 54, 50, 47, 43, 40, 37, 34, 31, 28, 26, 23, 21, 19, 17, 16, 14, 13, 12, 11, 10,
+float gauss[100] = { 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 8, 9, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 26, 28, 31, 34, 37, 40, 43, 47, 45, 54, 57, 60, 64, 67, 70, 73, 76,
+                     78, 80, 82, 83, 84, 85, 85, 85, 84, 83, 82, 80, 78, 76, 73, 70, 67, 64, 60, 57, 54, 45, 47, 43, 40, 37, 34, 31, 28, 26, 23, 21, 19, 17, 16, 14, 13, 12, 11, 10,
                      9, 9, 8, 7, 7, 7, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5 };
 
 AsyncWebServer server(80);
 
 String hex_val, picker_val, color_val;
-int breath_val = 50, r_val, g_val, b_val, display_radio_val;
+int breath_val = 45, r_val, g_val, b_val, display_radio_val=69;
 float brightness,newval, oldval, slope, scaleval = 0.5;
 const char* ssid = WLAN;
 const char* password = PASS;
@@ -63,7 +63,7 @@ int led_bands[8];
 float scale;
 
 bool ap_status = false;
-String ip;
+String ip, current_wifi;
 
 #include "ledfunc.h"
 
@@ -91,6 +91,8 @@ void color_set() {
   r_val = String(number >> 16).toInt();
   g_val = String(number >> 8 & 0xFF).toInt();
   b_val = String(number & 0xFF).toInt();
+
+
   //  EEPROM.write(0, r_val);
   //  EEPROM.write(1, g_val);
   //  EEPROM.write(2, b_val);
@@ -114,14 +116,16 @@ void setup() {
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  
+  current_wifi = ssid;
+
   if (WiFi.waitForConnectResult() != WL_CONNECTED) 
   {
     display_text("Unable to connect to", 0, 30, 1);
     display_text(ssid, 0, 40, 1);
-    display_text("Switching to AP Mode.", 0, 50, 1);
+    display_text("Switching to AP Mode.", 0, 45, 1);
     ap_status = true;
-    delay(5000);
+    current_wifi = "WiFi_LED";
+    delay(4500);
   }
   
   if (ap_status == true)
@@ -162,21 +166,38 @@ void setup() {
   display_text("IP:", 0, 20, 1);
   display_text(ap_status? WiFi.softAPIP().toString() : WiFi.localIP().toString(), 17, 20, 1);
 
+  display_text("Wi-Fi: ", 0, 32, 1);
+  display_text(current_wifi, 45, 32, 1);
+
   server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
     request->send_P(200, "text/html", index_html);
     String input_parameter;
-    if ((request->hasParam("display_input") and request->hasParam("picker_input"))) {
 
-      val_change = true;
+    // if ((request->hasParam("display_input") and request->hasParam("picker_input"))) {
+
+    //   val_change = true;
+    //   color_val = request->getParam("picker_input")->value();
+    //   display_radio_val = (request->getParam("display_input")->value()).toInt();
+    //   //      EEPROM.write(3,display_radio_val);
+    //   //      EEPROM.commit();
+    //   color_set();
+    // }
+    if (request->hasParam("picker_input"))
+    {
       color_val = request->getParam("picker_input")->value();
-      display_radio_val = (request->getParam("display_input")->value()).toInt();
-      //      EEPROM.write(3,display_radio_val);
-      //      EEPROM.commit();
-      color_set();
+      if (color_val != "#010101")
+      {
+        color_set();
+        val_change = true;
+      }
     }
 
-    else {
+    if (request->hasParam("display_input"))
+    {
+      display_radio_val = (request->getParam("display_input")->value()).toInt();
+      val_change = true;
     }
+
   });
   server.onNotFound(notFound);
   server.begin();
@@ -201,19 +222,21 @@ void setup() {
 void loop() {
 
   if (val_change == true) {
-    display_text("Red: ", 0, 32, 1);
-    display_rect(50, 32, 21, 10);
-    display_text(String(r_val), 50, 32, 1);
 
-    display_text("Green: ", 0, 42, 1);
-    display_rect(50, 42, 21, 10);
-    display_text(String(g_val), 50, 42, 1);
+    display_text("Mode: ", 0, 42, 1);
+    display_rect(45, 42, 86, 10);
+    switch (display_radio_val)
+    {
+      case 0: display_text("Solid", 45, 42, 1); break;
+      case 1: display_text("Breathing", 45, 42, 1); break;
+      case 2: display_text("Audio-Viz", 45, 42, 1); break;
+      case 3: display_text("Spectrum", 45, 42, 1); break;
+      default: display_text("None", 45, 42, 1); break;
+    }
 
-    display_text("Blue: ", 0, 52, 1);
-    display_rect(50, 52, 21, 10);
-    display_text(String(b_val), 50, 52, 1);
-
-    val_change = false;
+    display_text("Color: ", 0, 52, 1);
+    display_rect(45, 52, 86, 10);
+    display_text(String(r_val)+','+String(g_val)+','+String(b_val), 45, 52, 1);
   }
 
   if (display_radio_val == 0)  //solid mode
@@ -229,5 +252,10 @@ void loop() {
   else if (display_radio_val == 2)   //AV mode
   {
     basicAV_mode();
+  }
+
+  else if (display_radio_val == 3)  //Spectrum mode
+  {
+    spectrum_mode(20);
   }
 }
