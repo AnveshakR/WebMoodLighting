@@ -1,6 +1,6 @@
 # LED_WEB
 
-This project is used to control a `WS2812B` RGB LED strip using a webpage local-hosted on Wi-Fi by an ESP8266 (`12-E` chip). 
+This project is used to control a `WS2812B` RGB LED strip using a webpage local-hosted on Wi-Fi by an ESP8266. 
 
 The motivation behind this project was so that there would be no need for yet another remote to control the lights as is normally the case. Also, having a webpage allows for easy updates to the software to update and add new functions for the same hardware.
 
