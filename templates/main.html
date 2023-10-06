@@ -1,4 +1,3 @@
-const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html>
   <head>
@@ -51,18 +50,18 @@ const char index_html[] PROGMEM = R"rawliteral(
     
     <div class="borderdiv">
     
-    <form action="/">
+    <form method="POST" action="/update">
       <p>Pick a color:</p><input type="color" name="picker_input" id="picker" value="#010101"/>
       <br>
       <br>
       <p>Select display type:</p>
-      <input type="radio" id="solid" name="display_input" value="0">Solid Color <br>
+      <input type="radio" id="solid" name="display_input" value="solid">Solid Color <br>
       <br>
-      <input type="radio" id="breathing" name="display_input" value="1">Breathing <br>
+      <input type="radio" id="breathing" name="display_input" value="breathing">Breathing <br>
       <br>
-      <input type="radio" id="basicAV" name="display_input" value="2">Basic Audio-Visualizer <br>
-      <br>
-      <input type="radio" id="spectrum" name="display_input" value="3">Color Spectrum<br>
+      <!-- <input type="radio" id="basicAV" name="display_input" value="AV">Basic Audio-Visualizer <br>
+      <br> -->
+      <input type="radio" id="spectrum" name="display_input" value="spectrum">Color Spectrum<br>
       <br>
       <br>
       <input type="submit" value="Submit">
@@ -71,4 +70,4 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
 
   </body>
-</html>)rawliteral";
+</html>
