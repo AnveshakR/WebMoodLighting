@@ -27,9 +27,9 @@ def led():
 
         if 'display_input' in request.form:
             current_state['display_type'] = request.form.get('display_input')
-
+    
     update_and_trigger()    
     return render_template('main.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0")
+    app.run(host="0.0.0.0")

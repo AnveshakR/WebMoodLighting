@@ -1,41 +1,11 @@
 # LED_WEB
 
-This project is used to control a `WS2812B` RGB LED strip using a webpage local-hosted on Wi-Fi by an ESP8266. 
+Same project, but adapted to Python to run on a Raspberry Pi.
+Webserver written with Flask.
 
-The motivation behind this project was so that there would be no need for yet another remote to control the lights as is normally the case. Also, having a webpage allows for easy updates to the software to update and add new functions for the same hardware.
+Recommended GPIO pins would be any of the PCM pins.
 
-The design has the following components:
-- `ESP8266 (12-E)`
-- `SSD1306 128x64 OLED Display (SPI config)`
-- `MAX4466 Electret Microphone Amplifier with Adjustable Gain Module`
-- `10kΩ Potentiometer`
-- `10μF 50V Capacitor`
+Run `sh run_scripts.sh` to run the tmux environment. Obviously you'll need tmux installed.
+You'll also need to create a pyenv-virtualenv with the name webled_env and install the libraries in the requirements.txt. I'll look into automating this process.
 
-The current program has the following functions:
-- Solid color display
-- Breathing color display
-- Basic Audio-Visualizer color display
-- Color Spectrum
-
-The audio visualizer is based on an FFT transform of the input data from the MAX4466.
-
-I have included the Arduino program, along with the KiCAD project for the PCB design.
-
----
-> Circuit Schematic
->
-> ![Schematic](/images/led_web_schematic.png)
-
----
-| PCB front view | PCB Back View |
-| --- | --- |
-|![PCB Front](/images/pcb_front.png)|![PCB Back](/images/pcb_back.png)|
-
-### TO-DO
-
-- [x] Proper commenting lol
-- [ ] Select particular audio freq for AV
-- [ ] Select Wi-Fi network
-- [ ] Load last config from memory
-- [ ] Over-voltage protection for components
-- [ ] Convert THT into SMD (improbable tbh)
+raspi_ws281x needs sudo access to run, so you'll need to enter your password in the first tmux pane. 
