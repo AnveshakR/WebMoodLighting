@@ -1,5 +1,9 @@
 from flask import Flask, render_template, request
 import socket
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -32,4 +36,10 @@ def led():
     return render_template('main.html')
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0")
+    port = os.getenv("FLASK_PORT")
+    
+    url = f"http://localhost:{port}/"
+    with open('curr_url', 'w') as file:
+        file.write(url)
+    
+    app.run(host="0.0.0.0", port=port)
