@@ -3,9 +3,13 @@ import time
 import socket
 import select
 from display_funcs import *
+from dotenv import load_dotenv
+import os
 
-NUM_LEDS = 300
-LED_PIN = 21
+load_dotenv()
+
+NUM_LEDS = int(os.getenv("NUM_LEDS"))
+LED_PIN = int(os.getenv("LED_GPIO"))
 LED_FREQ_HZ = 800000
 LED_DMA = 10
 DEFAULT_BRIGHTNESS = 255
@@ -37,9 +41,11 @@ server_socket.listen(5)
 def handle_client(client_socket):
     try:
         data = client_socket.recv(1024).decode('utf-8')
-
-        if data:
-            current_state['color_hex'], current_state['display_type'] = data.split() 
+        data = data.split() 
+        if data[0] != "None":
+            current_state['color_hex'] = data[0] 
+        if data[1] != "None":
+            current_state['display_type'] = data[1] 
 
     except Exception as e:
         print('Exception detected, exiting...', flush=True)
@@ -79,3 +85,20 @@ while True:
     elif current_state['display_type'] == 'spectrum':
 
         spectrum_mode(50, NUM_LEDS, strip)
+
+
+    elif current_state['display_type'] == 'christmas':
+        colors = [Color(255, 0, 0),  
+                  Color(255, 0, 0),  
+                  Color(125, 125, 125),
+                  Color(125, 125, 125),
+                  Color(0, 255, 0),
+                  Color(0, 255, 0)]
+
+        for _ in range(6):
+            for led in range(NUM_LEDS):
+                strip.setPixelColor(led, colors[led % 6])  
+            strip.show()
+            time.sleep(0.5)
+             
+            colors = colors[-1:] + colors[:-1]
