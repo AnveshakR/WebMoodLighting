@@ -1,109 +1,108 @@
-void solid_mode() // single color
-{
-  for (int i = 0; i < NUM_LEDS; i++) 
-    {
-      if(val_change == true) {val_change = false;break;}
+void hexToRGB(const char* hex, int rgb[3]) {
+  char rStr[3] = { hex[1], hex[2], '\0' };
+  char gStr[3] = { hex[3], hex[4], '\0' };
+  char bStr[3] = { hex[5], hex[6], '\0' };
 
-      strip.SetPixelColor(i, RgbColor(r_val*0.85, g_val*0.85, b_val*0.85));
-    }
-    strip.Show();
-    delay(1);
+  rgb[0] = strtol(rStr, NULL, 16);
+  rgb[1] = strtol(gStr, NULL, 16);
+  rgb[2] = strtol(bStr, NULL, 16);
 }
 
-void breathing_mode() // gaussian breathing
-{
+// Solid color mode
+void solid_mode() {
+  for (int i = 0; i < NUM_LEDS; i++) {
+    strip.SetPixelColor(i, RgbColor(rgb[0]*0.85, rgb[1]*0.85, rgb[2]*0.85));
+  }
+  strip.Show();
+  delay(1);
+}
+
+// Breathing mode
+void breathing_mode() {
+  int gauss_size = 100;
+  float gauss[100] = { 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 8, 9, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 26, 28, 31, 34, 37, 40, 43, 47, 45, 54, 57, 60, 64, 67, 70, 73, 76,
+                     78, 80, 82, 83, 84, 85, 85, 85, 84, 83, 82, 80, 78, 76, 73, 70, 67, 64, 60, 57, 54, 45, 47, 43, 40, 37, 34, 31, 28, 26, 23, 21, 19, 17, 16, 14, 13, 12, 11, 10,
+                     9, 9, 8, 7, 7, 7, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5 };
+  
   for (int i = gauss_size - 1; i >= 0; i--) {
-
-    if(val_change == true) {val_change = false;break;}
-
-    for (int j = 0; j < NUM_LEDS; j++) 
-      {
-        strip.SetPixelColor(j, RgbColor((r_val * gauss[i]) / 100, (g_val * gauss[i]) / 100, (b_val * gauss[i]) / 100));
-      }
-      strip.Show();
-      delay(32);
-    }
-}
-
-void basicAV_mode()
-{
-  for (int i = 0; i < SAMPLES; i++) // collects samples equal to sample size from microphone
-  {
-
-    if(val_change == true) {val_change = false;break;}
-
-    newTime = micros()-oldTime;
-    oldTime = newTime;
-    vReal[i] = analogRead(A0); // A conversion takes about 1mS on an ESP8266
-    vImag[i] = 0;
-    while (micros() < (newTime + sampling_period_us)) { /* do nothing to wait */ } // wait until all the samples are collected
-  }
-  FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-  FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
-  FFT.ComplexToMagnitude(vReal, vImag, SAMPLES);
-
-  for (int i = 2; i < (SAMPLES/2); i++)
-  {
-    if (vReal[i] > amplitude)
-      {
-        scale = (vReal[i]/amplitude)/100.0;
-        if (scale>1.0)
-        {
-          scale = 1.0;
-        }
-        if (scale<0.05)
-        {
-          scale = 0.05;
-        }
-        // Serial.println(0);
-        // Serial.println(1);
-        // Serial.println(scale);
-        for (int j=0; j< NUM_LEDS ; j++)
-        {
-          strip.SetPixelColor(j, RgbColor(r_val*scale, g_val*scale, b_val*scale));
-        }
-        strip.Show();
-        delay(1);
-      }
-  }
-}
-
-byte * Wheel(byte WheelPos) {
-  static byte c[3];
- 
-  if(WheelPos < 85) {
-   c[0]=WheelPos * 3;
-   c[1]=255 - WheelPos * 3;
-   c[2]=0;
-  } else if(WheelPos < 170) {
-   WheelPos -= 85;
-   c[0]=255 - WheelPos * 3;
-   c[1]=0;
-   c[2]=WheelPos * 3;
-  } else {
-   WheelPos -= 170;
-   c[0]=0;
-   c[1]=WheelPos * 3;
-   c[2]=255 - WheelPos * 3;
-  }
-
-  return c;
-}
-
-void spectrum_mode(int SpeedDelay) {
-  byte *c;
-  uint16_t i, j;
-
-  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-    for(i=0; i< NUM_LEDS; i++) 
-    {
-
-      if(val_change == true) {val_change = false;break;}
-
-      c=Wheel(((i * 256 / NUM_LEDS) + j) & 255);
-      strip.SetPixelColor(i, RgbColor(int(*c), int(*(c+1)), int(*(c+2))));
+    if (!shouldContinueMode("breathing")) return;
+    
+    for (int j = 0; j < NUM_LEDS; j++) {
+      strip.SetPixelColor(j, RgbColor((rgb[0] * gauss[i]) / 100, (rgb[1] * gauss[i]) / 100, (rgb[2] * gauss[i]) / 100));
     }
     strip.Show();
-    delay(SpeedDelay);
+    delay(32);
   }
+}
+
+// AV mode
+void AV_mode(String fft_band) {
+  int band_index = fft_band.toInt();
+  if (band_index < 0 || band_index >= 10) return;
+  
+  // Get FFT value for specified band
+  float raw_fft_val = bandLevels[band_index];
+  
+  // Scale and process FFT value for LED brightness
+  float scaled_val = raw_fft_val / 100.0;
+  scaled_val = constrain(scaled_val, 0.0, 3.0);
+  
+  // Apply gamma correction for better visual perception
+  float gamma_corrected = pow(scaled_val / 3.0, 0.4);
+  gamma_corrected = constrain(gamma_corrected, 0.0, 1.0);
+  
+  // Apply minimum threshold to avoid flicker
+  if (gamma_corrected < 0.02) gamma_corrected = 0.0;
+  
+  int final_r = (int)(rgb[0] * gamma_corrected);
+  int final_g = (int)(rgb[1] * gamma_corrected);
+  int final_b = (int)(rgb[2] * gamma_corrected);
+  
+  RgbColor color(final_r, final_g, final_b);
+  for (int i = 0; i < NUM_LEDS; i++) {
+    strip.SetPixelColor(i, color);
+  }
+  strip.Show();
+}
+
+// Spectrum mode
+void spectrum_mode(int speed_delay) {
+  static unsigned long last_update = 0;
+  static uint16_t hue_offset = 0;
+  
+  // Non-blocking timing
+  if (millis() - last_update < speed_delay) return;
+  last_update = millis();
+  
+  // Check if we should continue this mode
+  if (!shouldContinueMode("spectrum")) return;
+  
+  for (int i = 0; i < NUM_LEDS; i++) {
+    uint8_t hue = (i * 255 / NUM_LEDS) + (hue_offset >> 8);
+    
+    //HSV to RGB
+    uint8_t r, g, b;
+    if (hue < 85) {
+      r = hue * 3;
+      g = 255 - hue * 3;
+      b = 0;
+    } else if (hue < 170) {
+      hue -= 85;
+      r = 255 - hue * 3;
+      g = 0;
+      b = hue * 3;
+    } else {
+      hue -= 170;
+      r = 0;
+      g = hue * 3;
+      b = 255 - hue * 3;
+    }
+    
+    strip.SetPixelColor(i, RgbColor(r, g, b));
+  }
+  
+  strip.Show();
+  
+  // Increment hue offset for next frame
+  hue_offset += 256;
 }
