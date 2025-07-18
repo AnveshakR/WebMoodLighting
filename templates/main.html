@@ -1,0 +1,382 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <title>LED Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      html {
+        font-family: Sans-Serif;
+        background-color: #222831;
+        color: #EEEEEE;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        display: flex;
+        min-height: 100vh;
+        margin: 0;
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        background-color: #1a1e26;
+        padding: 15px;
+        border-bottom: 2px solid #393E46;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+      }
+
+      @media (min-width: 768px) {
+        body {
+          flex-direction: row;
+        }
+        
+        .sidebar {
+          width: 250px;
+          border-right: 2px solid #393E46;
+          border-bottom: none;
+          flex-direction: column;
+          padding: 20px;
+        }
+      }
+
+      .sidebar h3 {
+        color: #7BC74D;
+        margin-bottom: 15px;
+        text-align: center;
+        width: 100%;
+      }
+
+      .esp-item {
+        background-color: #393E46;
+        padding: 12px;
+        margin-bottom: 8px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        min-width: 140px;
+        flex: 1;
+        max-width: 200px;
+      }
+
+      @media (min-width: 768px) {
+        .esp-item {
+          margin-bottom: 10px;
+          padding: 15px;
+          min-width: auto;
+          max-width: none;
+        }
+      }
+
+      .esp-item:hover {
+        background-color: #4a505a;
+      }
+
+      .esp-item.selected {
+        background-color: #7BC74D;
+        color: #222831;
+      }
+
+      .esp-name {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      .esp-status {
+        font-size: 0.9em;
+        opacity: 0.8;
+      }
+
+      .main-content {
+        flex: 1;
+        padding: 15px;
+        text-align: center;
+      }
+
+      h2 {
+        font-size: 2.5rem;
+        color: #7BC74D;
+        margin-bottom: 10px;
+      }
+
+      @media (min-width: 768px) {
+        .main-content {
+          padding: 20px;
+        }
+        
+        h2 {
+          font-size: 3.0rem;
+        }
+      }
+
+      .current-esp {
+        font-size: 1.1em;
+        color: #EEEEEE;
+        margin-bottom: 20px;
+      }
+
+      @media (min-width: 768px) {
+        .current-esp {
+          font-size: 1.2em;
+          margin-bottom: 30px;
+        }
+      }
+
+      p {
+        color: #EEEEEE;
+      }
+
+      input, button {
+        background-color: #393E46;
+        color: #EEEEEE;
+        border: 1px solid #555;
+        padding: 8px;
+        border-radius: 4px;
+      }
+
+      input[type="color"] {
+        width: 60px;
+        height: 35px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      @media (min-width: 768px) {
+        input[type="color"] {
+          width: 80px;
+          height: 40px;
+        }
+      }
+
+      input[type="radio"] {
+        margin-right: 8px;
+        transform: scale(1.2);
+      }
+
+      label {
+        margin-right: 15px;
+        cursor: pointer;
+        display: inline-block;
+        margin-bottom: 8px;
+        padding: 5px;
+      }
+
+      @media (min-width: 768px) {
+        label {
+          margin-right: 20px;
+          margin-bottom: 0;
+        }
+      }
+
+      div.borderdiv {
+        margin: auto;
+        text-align: center;
+        border: 2px solid #393E46;
+        border-radius: 12px;
+        width: 90%;
+        padding: 20px;
+        background-color: #2a2f36;
+      }
+
+      @media (min-width: 768px) {
+        div.borderdiv {
+          width: 60%;
+          padding: 30px;
+        }
+      }
+
+      .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+
+      .status-online {
+        background-color: #7BC74D;
+      }
+
+      .status-offline {
+        background-color: #ff4444;
+      }
+
+      .loading {
+        opacity: 0.6;
+      }
+    </style>
+
+    <script>
+      let currentESP = 'desk';
+      let espStates = {};
+
+      async function loadESPStates() {
+        try {
+          const response = await fetch('/get_esp_states');
+          if (response.ok) {
+            espStates = await response.json();
+            updateUI();
+          }
+        } catch (error) {
+          console.error('Failed to load ESP states:', error);
+        }
+      }
+
+      function updateUI() {
+        // Update sidebar
+        const espItems = document.querySelectorAll('.esp-item');
+        espItems.forEach(item => {
+          const espId = item.dataset.espId;
+          const statusElement = item.querySelector('.esp-status');
+          const indicatorElement = item.querySelector('.status-indicator');
+          
+          if (espStates[espId]) {
+            const state = espStates[espId];
+            statusElement.textContent = `IP: ${state.ip || 'Unknown'}`;
+            
+            // Update status indicator (simple check if IP exists)
+            if (state.ip && state.ip !== 'unknown') {
+              indicatorElement.className = 'status-indicator status-online';
+            } else {
+              indicatorElement.className = 'status-indicator status-offline';
+            }
+          }
+        });
+
+        // Update main content
+        if (espStates[currentESP]) {
+          const currentState = espStates[currentESP].current_state;
+          document.getElementById('picker').value = currentState.color_hex;
+          
+          // Update radio buttons
+          const radioButton = document.querySelector(`input[name="display_input"][value="${currentState.display_type}"]`);
+          if (radioButton) {
+            radioButton.checked = true;
+          }
+        }
+
+        // Update current ESP display
+        const espConfig = {{ esp_config | tojson }};
+        document.querySelector('.current-esp').textContent = `Controlling: ${espConfig[currentESP].name}`;
+      }
+
+      function selectESP(espId) {
+        currentESP = espId;
+        
+        // Update selected state
+        document.querySelectorAll('.esp-item').forEach(item => {
+          item.classList.remove('selected');
+        });
+        document.querySelector(`[data-esp-id="${espId}"]`).classList.add('selected');
+        
+        updateUI();
+      }
+
+      async function sendUpdate() {
+        const colorHex = document.getElementById("picker").value;
+        const displayType = document.querySelector('input[name="display_input"]:checked')?.value;
+
+        if (!colorHex || !displayType) return;
+
+        const payload = {
+          esp_id: currentESP,
+          color_hex: colorHex,
+          display_type: displayType
+        };
+
+        try {
+          const response = await fetch("/update", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            alert("Failed to update Home Assistant.");
+          } else {
+            // Update local state
+            if (!espStates[currentESP]) espStates[currentESP] = { current_state: {} };
+            espStates[currentESP].current_state = {
+              color_hex: colorHex,
+              display_type: displayType
+            };
+          }
+        } catch (error) {
+          alert("Network error occurred.");
+          console.error(error);
+        }
+      }
+
+      function initListeners() {
+        document.getElementById("picker").addEventListener("input", sendUpdate);
+        document.querySelectorAll('input[name="display_input"]').forEach(radio => {
+          radio.addEventListener("change", sendUpdate);
+        });
+
+        // ESP selection listeners
+        document.querySelectorAll('.esp-item').forEach(item => {
+          item.addEventListener('click', () => {
+            selectESP(item.dataset.espId);
+          });
+        });
+
+        // Load initial states
+        loadESPStates();
+        
+        // Refresh states every 30 seconds
+        setInterval(loadESPStates, 30000);
+      }
+
+      window.onload = initListeners;
+    </script>
+  </head>
+  <body>
+    <div class="sidebar">
+      <h3>ESP Devices</h3>
+      {% for esp_id, config in esp_config.items() %}
+      <div class="esp-item {% if loop.first %}selected{% endif %}" data-esp-id="{{ esp_id }}">
+        <div class="esp-name">
+          <span class="status-indicator status-offline"></span>
+          {{ config.name }}
+        </div>
+        <div class="esp-status">Loading...</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="main-content">
+      <h2>LED Control</h2>
+      <div class="current-esp">Controlling: Desk Lights</div>
+
+      <div class="borderdiv">
+        <p>Pick a color:</p>
+        <input type="color" name="picker_input" id="picker" value="#010101" />
+
+        <br><br>
+        <p>Select display type:</p>
+
+        <input type="radio" id="solid" name="display_input" value="solid" checked>
+        <label for="solid">Solid Color</label><br><br>
+
+        <input type="radio" id="breathing" name="display_input" value="breathing">
+        <label for="breathing">Breathing</label><br><br>
+
+        <input type="radio" id="AV" name="display_input" value="AV">
+        <label for="AV">Basic Audio-Visualizer</label><br><br>
+
+        <input type="radio" id="spectrum" name="display_input" value="spectrum">
+        <label for="spectrum">Color Spectrum</label><br><br>
+
+        <input type="radio" id="christmas" name="display_input" value="christmas">
+        <label for="christmas">Christmas</label><br><br>
+      </div>
+    </div>
+  </body>
+</html>
