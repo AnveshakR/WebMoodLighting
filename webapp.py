@@ -33,7 +33,7 @@ current_states = {
     }
 }
 
-HOME_ASSISTANT_BASE_URL = "http://10.0.0.50:8123/api/states/"
+HOME_ASSISTANT_BASE_URL = f"{os.getenv("HA_HOST")}/api/states/"
 HOME_ASSISTANT_TOKEN = os.getenv("HA_TOKEN")
 
 def get_ha_entity_state(entity_id):

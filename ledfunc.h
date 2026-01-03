@@ -1,3 +1,16 @@
+#ifndef LEDFUNC_H
+#define LEDFUNC_H
+
+#include <NeoPixelBus.h>
+
+// Extern declarations for variables defined in main file
+extern NeoPixelBus<NeoGrbFeature, NeoWs2812xMethod> strip;
+extern int rgb[3];
+extern float bandLevels[10];
+
+// Function prototype
+bool shouldContinueMode(String expected_mode);
+
 void hexToRGB(const char* hex, int rgb[3]) {
   char rStr[3] = { hex[1], hex[2], '\0' };
   char gStr[3] = { hex[3], hex[4], '\0' };
@@ -106,3 +119,5 @@ void spectrum_mode(int speed_delay) {
   // Increment hue offset for next frame
   hue_offset += 256;
 }
+
+#endif

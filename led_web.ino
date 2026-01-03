@@ -4,6 +4,7 @@
 #include <NeoPixelBus.h>
 #include <WebServer.h>
 #include "env.h"
+#include "ledfunc.h"
 
 WebServer server(80);
 float bandLevels[10] = {0}; // FFT band data from audio visualization
