@@ -40,12 +40,12 @@ const char* HA_HOST = "http://YOUR_HA_IP:8123";
 const char* HA_TOKEN = "your_home_assistant_long_lived_access_token";
 
 // Home Assistant Entity IDs
-const char* HA_IP_ENTITY = "input_text.desk_esp_ip";
-const char* HA_LED_STATE_ENTITY = "input_text.desk_esp_state";
+const char* HA_IP_ENTITY = "input_text.your_esp_ip_entity";
+const char* HA_LED_STATE_ENTITY = "input_text.your_esp_state_entity";
 
 // LED Strip Configuration
-#define LED_PIN  5
-#define NUM_LEDS 300
+#define LED_PIN  <GPIO pin to control strip>
+#define NUM_LEDS <number of LEDs in your LED strip>
 
 #endif
 ```
@@ -107,4 +107,4 @@ Use the three WAGO lever nut connectors to make the following connections:
 
 **Connector 3 (Data Signal):**
 - Data/TRIG pin of LED strip
-- GPIO pin of ESP32 (as defined by `LED_PIN` in env.h, default: GPIO 5)
+- GPIO pin of ESP32 (as defined by `LED_PIN` in env.h, recommended: GPIO 5)
