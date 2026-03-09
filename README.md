@@ -20,6 +20,32 @@ This project controls a WS2812B RGB LED strip connected to an ESP32 by interfaci
 - Audio-visualizer color display (requires external audio source posting to `/update_fft`)
 - Color spectrum
 
+## Configuration
+
+Create this `env.h` file in the project directory and fill in the values as per your setup.
+
+```cpp
+#ifndef ENV_H
+#define ENV_H
+
+// WiFi
+const char* WIFI_SSID     = "your_wifi_ssid";
+const char* WIFI_PASSWORD = "your_wifi_password";
+
+// Home Assistant
+const char* HA_HOST  = "http://YOUR_HA_IP:8123";
+const char* HA_TOKEN = "your_long_lived_access_token"; // Profile → Long-Lived Access Tokens
+
+// Identity — IMPORTANT: must match the name entered in the LED ESP HA integration
+const char* ESP_NAME = "your_esp_name";
+
+// Strip
+#define LED_PIN  5      // GPIO pin connected to the LED strip data line
+#define NUM_LEDS 300    // total number of LEDs in your strip
+
+#endif
+```
+
 ## Installation
 
 ### 1. Home Assistant Integration
@@ -50,7 +76,7 @@ After restart, go to **Settings → Devices & Services → Add Integration** and
 
 ### 3. Flash the ESP32
 
-Configure `env.h` with the same name used in step 2, then flash `led_web.ino` via the Arduino IDE. The ESP must be flashed and started after the integration entry exists in HA, since it posts its IP to HA on boot.
+Make sure `env.h` is configured with the **same name** used in step 2, then flash `led_web.ino` via the Arduino IDE. The ESP should be flashed and started after the integration entry exists in HA, since it posts its IP to HA on boot.
 
 ### 4. Lovelace Dashboard
 
@@ -67,32 +93,6 @@ Add a **Light card** pointing at `light.<name>` for the color picker, and an **E
     - entity: sensor.test_lights_ip
       name: IP
       icon: mdi:ip-network
-```
-
-## Configuration
-
-### env.h (ESP32 Arduino Sketch)
-
-```cpp
-#ifndef ENV_H
-#define ENV_H
-
-// WiFi
-const char* WIFI_SSID     = "your_wifi_ssid";
-const char* WIFI_PASSWORD = "your_wifi_password";
-
-// Home Assistant
-const char* HA_HOST  = "http://YOUR_HA_IP:8123";
-const char* HA_TOKEN = "your_long_lived_access_token"; // Profile → Long-Lived Access Tokens
-
-// Identity — IMPORTANT: must match the name entered in the LED ESP HA integration
-const char* ESP_NAME = "your_esp_name";
-
-// Strip
-#define LED_PIN  5      // GPIO pin connected to the LED strip data line
-#define NUM_LEDS 300    // total number of LEDs in your strip
-
-#endif
 ```
 
 ## 3D Printed Enclosure
