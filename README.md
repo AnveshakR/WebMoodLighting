@@ -1,87 +1,105 @@
 # LED_WEB
 
-A smart LED lighting control system that integrates WS2812B RGB LED strips with Home Assistant and a Flask web interface for flexible, remote-free control.
+A smart LED lighting control system that integrates WS2812B RGB LED strips with Home Assistant for flexible, remote-free control.
 
 ## Overview
 
-This project controls a WS2812B RGB LED strip connected to an ESP32 by interfacing with:
-- **Home Assistant** server on the local network for smart home integration
-- **Flask web server** providing a locally hosted webpage for light control
+This project controls a WS2812B RGB LED strip connected to an ESP32 by interfacing with a **Home Assistant** server on the local network. A custom HA integration creates per-ESP entities and a Lovelace dashboard widget for each strip, with no intermediary server required.
 
 ### Key Features
 
-- **No Remote Required**: Control lights through Home Assistant or web interface
-- **Easy Updates**: Web-based interface allows software updates without hardware changes
-- **Real-Time Audio Visualization**: USB microphone on the server provides live audio data for music-reactive lighting effects
+- **No Remote Required**: Control lights directly through Home Assistant
+- **Easy Scaling**: Adding a new ESP requires only flashing the firmware with a new name and adding one integration entry in HA — no other changes needed
+- **Dashboard Widget**: Each ESP gets a native HA color picker and display mode dropdown
+- **Real-Time Audio Visualization**: Strip brightness can follow live audio FFT data posted to the ESP's local endpoint
 
 ### Available Lighting Modes
 
 - Solid color display
 - Breathing color display
-- Audio-visualizer color display
+- Audio-visualizer color display (requires external audio source posting to `/update_fft`)
 - Color spectrum
+
+## Installation
+
+### 1. Home Assistant Integration
+
+Clone the repo and copy the integration folder into your HA config directory from within the HA Terminal addon:
+
+```bash
+git clone https://github.com/AnveshakR/WebMoodLighting.git /tmp/led_web
+cp -r /tmp/led_web/custom_components/led_esp /config/custom_components/
+rm -rf /tmp/led_web
+```
+
+After copying, restart HA:
+
+```bash
+ha core restart
+```
+
+### 2. Add an ESP in Home Assistant
+
+After restart, go to **Settings → Devices & Services → Add Integration** and search for **LED ESP**. Enter a name for the ESP (e.g. `desk`). This creates three entities:
+
+| Entity | ID | Purpose |
+|--------|-----|---------|
+| Light | `light.<name>` | RGB color and on/off |
+| Select | `select.<name>_display_state` | Display mode dropdown |
+| Sensor | `sensor.<name>_ip` | ESP IP address (updated on boot) |
+
+### 3. Flash the ESP32
+
+Configure `env.h` with the same name used in step 2, then flash `led_web.ino` via the Arduino IDE. The ESP must be flashed and started after the integration entry exists in HA, since it posts its IP to HA on boot.
+
+### 4. Lovelace Dashboard
+
+Add a **Light card** pointing at `light.<name>` for the color picker, and an **Entities card** or **Tile card** with `select.<name>_display_state` below it. Suggested YAML for a single ESP named `test_lights`:
+
+```yaml
+- type: entities
+  title: Test Lights LED Strip
+  entities:
+    - entity: light.test_lights
+      name: Color & Power
+    - entity: select.test_lights_display_state
+      name: Display Mode
+    - entity: sensor.test_lights_ip
+      name: IP
+      icon: mdi:ip-network
+```
 
 ## Configuration
 
-### env.h File (ESP32 Arduino Sketch)
-
-Create an `env.h` file in the project root directory with the following configuration values:
+### env.h (ESP32 Arduino Sketch)
 
 ```cpp
 #ifndef ENV_H
 #define ENV_H
 
-// WiFi Configuration
-const char* WIFI_SSID = "your_wifi_ssid";
+// WiFi
+const char* WIFI_SSID     = "your_wifi_ssid";
 const char* WIFI_PASSWORD = "your_wifi_password";
 
-// Home Assistant Configuration
-const char* HA_HOST = "http://YOUR_HA_IP:8123";
-const char* HA_TOKEN = "your_home_assistant_long_lived_access_token";
+// Home Assistant
+const char* HA_HOST  = "http://YOUR_HA_IP:8123";
+const char* HA_TOKEN = "your_long_lived_access_token"; // Profile → Long-Lived Access Tokens
 
-// Home Assistant Entity IDs
-const char* HA_IP_ENTITY = "input_text.your_esp_ip_entity";
-const char* HA_LED_STATE_ENTITY = "input_text.your_esp_state_entity";
+// Identity — IMPORTANT: must match the name entered in the LED ESP HA integration
+const char* ESP_NAME = "your_esp_name";
 
-// LED Strip Configuration
-#define LED_PIN  <GPIO pin to control strip>
-#define NUM_LEDS <number of LEDs in your LED strip>
+// Strip
+#define LED_PIN  5      // GPIO pin connected to the LED strip data line
+#define NUM_LEDS 300    // total number of LEDs in your strip
 
 #endif
 ```
-
-**Configuration Details:**
-
-- **WIFI_SSID**: Your local WiFi network name
-- **WIFI_PASSWORD**: Your WiFi password
-- **HA_HOST**: Home Assistant server URL (format: `http://IP_ADDRESS:8123`)
-- **HA_TOKEN**: Long-lived access token from Home Assistant (Generate in: Profile → Long-Lived Access Tokens)
-- **HA_IP_ENTITY**: Home Assistant input_text entity to store the ESP32's IP address
-- **HA_LED_STATE_ENTITY**: Home Assistant input_text entity to store the LED state
-- **LED_PIN**: GPIO pin on the ESP32 connected to the LED strip data line (default: GPIO 5)
-- **NUM_LEDS**: Total number of LEDs in your strip
-
-### .env File (Flask Web Server)
-
-Create a `.env` file in the project root directory for the Flask web server:
-
-```
-HA_HOST=http://YOUR_HA_IP:8123
-HA_TOKEN=your_home_assistant_long_lived_access_token
-FLASK_PORT=5000
-```
-
-**Configuration Details:**
-
-- **HA_HOST**: Home Assistant server URL (should match the one in env.h)
-- **HA_TOKEN**: Long-lived access token from Home Assistant (should match the one in env.h)
-- **FLASK_PORT**: Port number for the Flask web server (default: 5000)
 
 ## 3D Printed Enclosure
 
 ![3D Printed Box](images/box.png)
 
-The [3D print files](3D%20print%20files/) folder contains STL files for a custom enclosure to house the ESP32 and wire connections, including a lid for the box.
+The [3D print files](3D%20print%20files/) folder contains STL files for a custom enclosure to house the ESP32 and wire connections. View them interactively on GitHub: [Box](3D%20print%20files/esp%20box.STL) · [Lid](3D%20print%20files/esp%20box%20lid.STL)
 
 ### Required Components
 

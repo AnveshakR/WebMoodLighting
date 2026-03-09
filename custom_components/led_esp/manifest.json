@@ -1,0 +1,11 @@
+{
+  "domain": "led_esp",
+  "name": "LED ESP",
+  "version": "1.0.0",
+  "documentation": "",
+  "requirements": [],
+  "dependencies": ["webhook"],
+  "codeowners": [],
+  "config_flow": true,
+  "iot_class": "local_polling"
+}

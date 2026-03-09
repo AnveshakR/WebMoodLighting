@@ -6,88 +6,118 @@
 #include "env.h"
 #include "ledfunc.h"
 
+// Server
 WebServer server(80);
-float bandLevels[10] = {0}; // FFT band data from audio visualization
 
+// Strip
 NeoPixelBus<NeoGrbFeature, NeoWs2812xMethod> strip(NUM_LEDS, LED_PIN);
+int rgb[3];
 
-int rgb[3]; // Current RGB color values
-String current_display_type = ""; // Track current mode for interruption checking
+// State
+float bandLevels[10] = {0};
+String current_display_type = "";
 
-// Update ESP32 IP address in Home Assistant
+// Entities — derived from ESP_NAME in setup()
+String ha_light_entity;
+String ha_display_entity;
+String ha_ip_webhook;
+
+
+/* Posts the ESP's current IP to Home Assistant via webhook. */
 void updateIPInHA() {
   if (WiFi.status() != WL_CONNECTED) return;
 
   HTTPClient http;
-  String url = String(HA_HOST) + "/api/states/" + HA_IP_ENTITY;
-  String payload = "{\"state\": \"" + WiFi.localIP().toString() + "\"}";
+  String payload = "{\"ip\": \"" + WiFi.localIP().toString() + "\"}";
 
-  http.begin(url);
-  http.addHeader("Authorization", "Bearer " + String(HA_TOKEN));
+  http.begin(ha_ip_webhook);
   http.addHeader("Content-Type", "application/json");
 
-  int code = http.sendRequest("POST", payload);
-  if (code != 200) {
-    Serial.println("IP update failed: " + String(code));
+  int code = http.POST(payload);
+  if (code != 200 && code != 201) {
+    Serial.println("IP webhook failed: " + String(code));
   }
   http.end();
 }
 
-// Get state from Home Assistant entity
-bool getStateFromHA(JsonDocument& doc, String state_entity) {
+/* Fetches a HA entity state and deserializes it into doc. Returns false on any failure. */
+bool getStateFromHA(JsonDocument& doc, const String& entity_id) {
   if (WiFi.status() != WL_CONNECTED) return false;
 
   HTTPClient http;
-  String url = String(HA_HOST) + "/api/states/" + state_entity;
-
-  http.begin(url);
+  http.begin(String(HA_HOST) + "/api/states/" + entity_id);
   http.addHeader("Authorization", "Bearer " + String(HA_TOKEN));
 
   int code = http.GET();
 
   if (code == 200) {
-    String payload = http.getString();
-    DeserializationError err = deserializeJson(doc, payload);
+    DeserializationError err = deserializeJson(doc, http.getString());
+    http.end();
     if (err) {
       Serial.println("JSON parse error: " + String(err.c_str()));
       return false;
     }
-    http.end();
     return true;
-  } else {
-    Serial.println("HA request failed: " + String(code));
-    http.end();
-    return false;
   }
+
+  Serial.println("HA request failed (" + entity_id + "): " + String(code));
+  http.end();
+  return false;
 }
 
-// Check if display type has changed (for interrupting long-running animations)
-bool shouldContinueMode(String expected_mode) {
-  StaticJsonDocument<512> check_doc;
-  if (getStateFromHA(check_doc, HA_LED_STATE_ENTITY)) {
-    auto state_str = check_doc["state"].as<const char*>();
-    StaticJsonDocument<200> parsed_state;
-    DeserializationError err = deserializeJson(parsed_state, state_str);
-    if (!err) {
-      String current_mode = parsed_state["display_type"];
-      return (current_mode == expected_mode);
+/* Reads light.<name> from HA. Sets is_on and updates rgb[]. Returns false on failure. */
+bool getLightState(bool& is_on) {
+  StaticJsonDocument<512> doc;
+  if (!getStateFromHA(doc, ha_light_entity)) return false;
+
+  is_on = (String(doc["state"].as<const char*>()) == "on");
+
+  if (is_on) {
+    JsonArray rgb_arr = doc["attributes"]["rgb_color"];
+    if (rgb_arr && rgb_arr.size() == 3) {
+      rgb[0] = rgb_arr[0];
+      rgb[1] = rgb_arr[1];
+      rgb[2] = rgb_arr[2];
+    } else {
+      rgb[0] = rgb[1] = rgb[2] = 255; // IMPORTANT: default white if HA has no color set yet
     }
   }
-  return false; // If we can't check, assume we should stop
+
+  return true;
 }
 
-// Handle FFT data updates from audio visualization
+/* Reads select.<name>_display_state from HA. Returns current_display_type unchanged on failure. */
+String getDisplayMode() {
+  StaticJsonDocument<256> doc;
+  if (!getStateFromHA(doc, ha_display_entity)) return current_display_type;
+  return doc["state"].as<String>();
+}
+
+/* Returns true if the current HA display mode still matches expected_mode. Used by animations. */
+bool shouldContinueMode(String expected_mode) {
+  StaticJsonDocument<256> doc;
+  if (!getStateFromHA(doc, ha_display_entity)) return false;
+  return doc["state"].as<String>() == expected_mode;
+}
+
+/* Sets all LEDs to black. */
+void clearStrip() {
+  for (int i = 0; i < NUM_LEDS; i++) {
+    strip.SetPixelColor(i, RgbColor(0, 0, 0));
+  }
+  strip.Show();
+}
+
+/* POST /update_fft — receives 10 FFT band level floats and updates bandLevels[]. */
 void handleUpdateFFT() {
   if (!server.hasArg("plain")) {
     server.send(400, "text/plain", "Missing body");
     return;
   }
 
-  String body = server.arg("plain");
   StaticJsonDocument<512> doc;
-  DeserializationError error = deserializeJson(doc, body);
+  DeserializationError error = deserializeJson(doc, server.arg("plain"));
   if (error) {
-    Serial.println("FFT JSON error: " + String(error.c_str()));
     server.send(400, "text/plain", "Invalid JSON");
     return;
   }
@@ -98,7 +128,6 @@ void handleUpdateFFT() {
     return;
   }
 
-  // Update band levels array
   for (int i = 0; i < 10; i++) {
     bandLevels[i] = arr[i].as<float>();
   }
@@ -106,17 +135,15 @@ void handleUpdateFFT() {
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
-
-
-// JSON status endpoint
+/* GET /status — returns basic ESP health info as JSON. */
 void handleStatus() {
   StaticJsonDocument<200> doc;
-  doc["status"] = "ok";
-  doc["ip"] = WiFi.localIP().toString();
-  doc["heap"] = ESP.getFreeHeap();
-  doc["uptime"] = millis() / 1000;
+  doc["status"]    = "ok";
+  doc["ip"]        = WiFi.localIP().toString();
+  doc["heap"]      = ESP.getFreeHeap();
+  doc["uptime"]    = millis() / 1000;
   doc["wifi_rssi"] = WiFi.RSSI();
-  
+
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
@@ -125,74 +152,55 @@ void handleStatus() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("ESP32 starting...");
-  
-  // Initialize LED strip
-  strip.Begin();
-  strip.Show(); // Clear all LEDs
-  
-  // Connect to WiFi
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
+  ha_light_entity   = String("light.")   + ESP_NAME;
+  ha_display_entity = String("select.")  + ESP_NAME + "_display_state";
+  ha_ip_webhook     = String(HA_HOST)    + "/api/webhook/led_esp_" + ESP_NAME + "_ip";
+
+  strip.Begin();
+  strip.Show();
+
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   int wifi_attempts = 0;
   while (WiFi.status() != WL_CONNECTED && wifi_attempts < 30) {
     delay(1000);
     wifi_attempts++;
   }
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("WiFi connected: " + WiFi.localIP().toString());
-  } else {
+  if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi connection failed");
     return;
   }
+  Serial.println("WiFi connected: " + WiFi.localIP().toString());
 
-  // Setup web server endpoints
-  server.on("/status", handleStatus);
+  server.on("/status",     handleStatus);
   server.on("/update_fft", HTTP_POST, handleUpdateFFT);
-  
   server.begin();
-  Serial.println("Server started");
-  
-  // Update IP in Home Assistant
+
   updateIPInHA();
-  Serial.println("Setup complete");
 }
 
 void loop() {
-  // Handle incoming web requests
   server.handleClient();
-  
-  // Get current LED state from Home Assistant
-  StaticJsonDocument<512> state_doc;
 
-  if (getStateFromHA(state_doc, HA_LED_STATE_ENTITY)) {
-    auto state_str = state_doc["state"].as<const char*>();
-    StaticJsonDocument<200> final_state_doc;
-    DeserializationError err1 = deserializeJson(final_state_doc, state_str);
-    
-    if (err1) {
-      Serial.println("State parse error: " + String(err1.c_str()));
-    } else {
-      // Update current display type and color
-      current_display_type = final_state_doc["display_type"].as<String>();
-      hexToRGB(final_state_doc["color_hex"], rgb);
-
-      // Execute appropriate LED mode
-      if (current_display_type == "solid") {
-        solid_mode();
-      }
-      else if (current_display_type == "breathing") {
-        breathing_mode();
-      }
-      else if (current_display_type == "AV") {
-        AV_mode("2");
-      }
-      else if (current_display_type == "spectrum") {
-        spectrum_mode(20);
-      }
-    }
+  bool light_on;
+  if (!getLightState(light_on)) {
+    delay(1000);
+    return;
   }
+
+  if (!light_on) {
+    clearStrip();
+    delay(100);
+    return;
+  }
+
+  current_display_type = getDisplayMode();
+
+  if      (current_display_type == "solid")     solid_mode();
+  else if (current_display_type == "breathing") breathing_mode();
+  else if (current_display_type == "AV")        AV_mode("2");
+  else if (current_display_type == "spectrum")  spectrum_mode(20);
 
   delay(1);
 }

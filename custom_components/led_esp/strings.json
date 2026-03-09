@@ -1,0 +1,19 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add LED ESP",
+        "description": "Enter the name for this ESP device. Use lowercase letters, numbers, and underscores only (e.g. \"desk\" or \"living_room\"). This name must match the ESP_NAME set in the firmware.",
+        "data": {
+          "esp_name": "ESP Name"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Name must contain only lowercase letters, numbers, and underscores."
+    },
+    "abort": {
+      "already_configured": "An ESP with this name is already configured."
+    }
+  }
+}
